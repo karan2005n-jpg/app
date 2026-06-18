@@ -43,7 +43,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   Future<void> addItem(String productName, List products) async {
-    cart[productName] = 1;
+    cart[productName] = (cart[productName] ?? 0) + 1;
     updateTotal(products);
     await saveCart();
   }
