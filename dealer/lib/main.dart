@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'screens/auth/login_page.dart';
 import 'screens/auth/dashboard.dart';
+import 'package:provider/provider.dart';
+import 'provider/cart_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => CartProvider()..loadCart(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

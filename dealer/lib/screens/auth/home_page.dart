@@ -3,9 +3,10 @@ import 'package:dealer/widgets/homepageicon.dart';
 import 'package:dealer/widgets/homepageorder.dart';
 import 'package:dealer/widgets/notification_button.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+import 'package:dealer/provider/cart_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,15 +16,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  Map<String, int> cart = {};
-  int totalAmount = 0;
-
   List products = [];
 
   @override
   void initState() {
     super.initState();
-    loadCart();
     fetchProducts();
   }
 
@@ -40,6 +37,10 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           products = data;
         });
+
+        if (mounted) {
+          context.read<CartProvider>().updateTotal(products);
+        }
       } else {
         debugPrint("ERROR: ${response.statusCode}");
       }
@@ -48,48 +49,15 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> saveCart() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString("cart", jsonEncode(cart));
-    await prefs.setInt("amount", totalAmount);
-  }
-
-  Future<void> loadCart() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    String? cartString = prefs.getString("cart");
-
-    setState(() {
-      if (cartString != null) {
-        cart = Map<String, int>.from(jsonDecode(cartString));
-      }
-
-      totalAmount = prefs.getInt("amount") ?? 0;
-    });
-  }
-
-  int get totalitems => cart.values.fold(0, (sum, q) => sum + q);
-
-  void updateTotal() {
-    totalAmount = 0;
-
-    for (var item in products) {
-      String name = item["product_name"];
-      int qty = cart[name] ?? 0;
-      int price = int.parse(item["unit_price_per_ton"].toString());
-
-      totalAmount += qty * price;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final cartProvider = context.watch<CartProvider>();
+
     return Scaffold(
-      bottomNavigationBar: totalitems > 0
+      bottomNavigationBar: cartProvider.totalItems > 0
           ? Container(
               height: 120,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
                 color: Colors.black,
               ),
@@ -103,13 +71,13 @@ class _HomePageState extends State<HomePage> {
                         height: 20,
                         width: 20,
                         color: Colors.orange,
-                        child: Center(
+                        child: const Center(
                           child: Icon(Icons.shopping_cart_outlined, size: 10),
                         ),
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Text(
-                        "SELECTED \n $totalitems tons",
+                        "SELECTED \n ${cartProvider.totalItems} tons",
                         style: const TextStyle(color: Colors.white),
                       ),
                       Container(
@@ -120,46 +88,45 @@ class _HomePageState extends State<HomePage> {
                           thickness: 1,
                         ),
                       ),
-                      Spacer(),
+                      const Spacer(),
                       Column(
                         children: [
-                          Text(
+                          const Text(
                             "ESTIMATED TOTAL",
                             style: TextStyle(color: Colors.white),
                           ),
-                          SizedBox(height: 5),
+                          const SizedBox(height: 5),
                           Text(
-                            "INR $totalAmount",
-                            style: TextStyle(color: Colors.white),
+                            "INR ${cartProvider.totalAmount}",
+                            style: const TextStyle(color: Colors.white),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepOrange,
-                      minimumSize: Size(double.infinity, 54),
+                      minimumSize: const Size(double.infinity, 54),
                     ),
                     onPressed: () async {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => Addtocart(
-                            totalAmount: totalAmount,
-                            totalitems: totalitems,
+                            totalAmount: cartProvider.totalAmount,
+                            totalitems: cartProvider.totalItems,
                           ),
                         ),
                       );
 
-                      await loadCart();
-
-                      setState(() {
-                        updateTotal();
-                      });
+                      if (mounted) {
+                        await context.read<CartProvider>().loadCart();
+                        context.read<CartProvider>().updateTotal(products);
+                      }
                     },
-                    child: Text(
+                    child: const Text(
                       "Proceed to Review ",
                       style: TextStyle(fontSize: 13),
                     ),
@@ -205,8 +172,8 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
-                    Spacer(),
-                    Padding(
+                    const Spacer(),
+                    const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 10),
                       child: Text(
                         "Create Order",
@@ -246,7 +213,9 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 10),
 
               products.isEmpty
-                  ? Center(child: CircularProgressIndicator(color: Colors.orange,))
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.orange),
+                    )
                   : Column(
                       children: products.map((item) {
                         String productName = item["product_name"];
@@ -260,47 +229,33 @@ class _HomePageState extends State<HomePage> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: Homepageorder(
                             onUpdated: () async {
-                              await loadCart();
-                              setState(() {updateTotal();});
-                              await saveCart();
+                              await cartProvider.loadCart();
+                              cartProvider.updateTotal(products);
                             },
                             id: productId,
                             name: productName,
-                            quantity: cart[productName] ?? 0,
+                            quantity: cartProvider.cart[productName] ?? 0,
                             onAdd: () async {
-                              setState(() {
-                                cart[productName] = 1;
-                                updateTotal();
-                              });
-                              await saveCart();
+                              await cartProvider.addItem(productName, products);
                             },
                             onIncrease: () async {
-                              setState(() {
-                                cart[productName] =
-                                    (cart[productName] ?? 0) + 1;
-                                updateTotal();
-                              });
-                              await saveCart();
+                              await cartProvider.increaseItem(
+                                productName,
+                                products,
+                              );
                             },
                             onDecrease: () async {
-                              setState(() {
-                                if (cart[productName] == 1) {
-                                  cart.remove(productName);
-                                } else {
-                                  cart[productName] =
-                                      cart[productName]! - 1;
-                                }
-
-                                updateTotal();
-                              });
-                              await saveCart();
+                              await cartProvider.decreaseItem(
+                                productName,
+                                products,
+                              );
                             },
                             imagePath: "assets/images/homepage.jpeg",
                             icon: Icons.check_box_outline_blank,
                             subtitle: description,
                             title: productName,
                             stockdata:
-                                "INR ${(cart[productName] ?? 0) * price}",
+                                "INR ${(cartProvider.cart[productName] ?? 0) * price}",
                             price: "₹$price",
                             imagedata: productName,
                           ),
