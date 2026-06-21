@@ -4,105 +4,140 @@ import 'package:dealer/widgets/social_button.dart';
 import 'package:dealer/widgets/custom_textfield.dart';
 import 'package:dealer/screens/auth/dashboard.dart';
 import 'signup.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginPage extends StatefulWidget {
-  
   const LoginPage({super.key});
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
+
 class _LoginPageState extends State<LoginPage> {
   bool isChecked = false;
   bool isLoading = false;
   String message = "";
-Color messageColor = Colors.red;
+  Color messageColor = Colors.red;
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-Future<void> _handleLogin({required String gmail, required String password}) async {
-  if (isLoading) return;
-  setState(() => isLoading = true);
 
-  try {
-    final response = await http.post(
-      Uri.parse("http://localhost:3001/auth/login"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "gmail": gmail, 
-        "password": password,
-      }),
-    );
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      if (kIsWeb) {
+        GoogleAuthProvider googleProvider = GoogleAuthProvider();
 
-    if (!mounted) return; 
+        final userCredential = await FirebaseAuth.instance.signInWithPopup(
+          googleProvider,
+        );
 
-    final data = jsonDecode(response.body);
-    debugPrint("Response: $data");
+        final user = userCredential.user;
 
-    if (response.statusCode == 200) {
-      final prefs = await SharedPreferences.getInstance();
+        if (user == null) return;
 
-      
-      final userData = data["user"];
-      if (userData == null) {
-        throw Exception("Missing 'user' object in API response");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardPage(
+              userName: user.displayName ?? "User",
+              successMessage: "Google Login Successful",
+            ),
+          ),
+        );
       }
+    } catch (e) {
+      debugPrint("Google Sign-In Error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Google Sign-In failed: $e")));
+    }
+  }
 
-      final int userId = userData["id"] ?? 0;
-      final String userName = userData["name"] ?? "User";
+  Future<void> _handleLogin({
+    required String gmail,
+    required String password,
+  }) async {
+    if (isLoading) return;
+    setState(() => isLoading = true);
 
-      
-      await prefs.setInt("user_id", userId);
-      await prefs.setString("user_name", userName);
+    try {
+      final response = await http.post(
+        Uri.parse("http://localhost:3001/auth/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"gmail": gmail, "password": password}),
+      );
 
       if (!mounted) return;
-setState(() {
-  message = "Login Successful";
-  messageColor = Colors.green;
-});
-      
-      
-      // 3. Fixed the exact error crash line by passing 'userName' variable
-      Navigator.pushReplacement( 
-        context,
-        MaterialPageRoute(
-          builder: (_) => DashboardPage(userName: userName, successMessage: "Login Successful"),
+
+      final data = jsonDecode(response.body);
+      debugPrint("Response: $data");
+
+      if (response.statusCode == 200) {
+        final prefs = await SharedPreferences.getInstance();
+
+        final userData = data["user"];
+        if (userData == null) {
+          throw Exception("Missing 'user' object in API response");
+        }
+
+        final int userId = userData["id"] ?? 0;
+        final String userName = userData["name"] ?? "User";
+
+        await prefs.setInt("user_id", userId);
+        await prefs.setString("user_name", userName);
+
+        if (!mounted) return;
+        setState(() {
+          message = "Login Successful";
+          messageColor = Colors.green;
+        });
+
+        // 3. Fixed the exact error crash line by passing 'userName' variable
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardPage(
+              userName: userName,
+              successMessage: "Login Successful",
+            ),
+          ),
+        );
+      } else if (response.statusCode == 400) {
+        setState(() {
+          message = data["message"] ?? "Email and password are required";
+          messageColor = Colors.red;
+        });
+      } else if (response.statusCode == 401) {
+        setState(() {
+          message = data["message"] ?? "Invalid Email or Password";
+          messageColor = Colors.red;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data["message"] ?? "An unknown error occurred"),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("ERROR: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: ${e.toString().replaceAll('Exception: ', '')}"),
         ),
       );
-    } else if (response.statusCode == 400) {
-      setState(() {
-  message = data["message"] ?? "Email and password are required";
-  messageColor = Colors.red;
-});
-      
-    } else if (response.statusCode == 401) {
-     setState(() {
-  message = data["message"] ?? "Invalid Email or Password";
-  messageColor = Colors.red;
-});
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(data["message"] ?? "An unknown error occurred")),
-      );
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-  } catch (e) {
-    debugPrint("ERROR: $e");
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error: ${e.toString().replaceAll('Exception: ', '')}")),
-    );
-  } finally {
-    if (mounted) setState(() => isLoading = false);
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-     
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
@@ -138,23 +173,23 @@ setState(() {
 
                         const SizedBox(height: 20),
                         if (message.isNotEmpty)
-  Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(12),
-    margin: const EdgeInsets.only(bottom: 12),
-    decoration: BoxDecoration(
-      color: messageColor.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: messageColor),
-    ),
-    child: Text(
-      message,
-      style: TextStyle(
-        color: messageColor,
-        fontWeight: FontWeight.w500,
-      ),
-    ),
-  ),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: messageColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: messageColor),
+                            ),
+                            child: Text(
+                              message,
+                              style: TextStyle(
+                                color: messageColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
 
                         Text(
                           "Login",
@@ -174,7 +209,6 @@ setState(() {
                         BuildInputField(
                           controller: emailController,
                           hintText: "abcd@gmail.com",
-                          
                         ),
 
                         const SizedBox(height: 10),
@@ -219,13 +253,11 @@ setState(() {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                          onPressed: () async {
+                            onPressed: () async {
                               await _handleLogin(
                                 gmail: emailController.text,
                                 password: passwordController.text,
                               );
-                             
-                              
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.orange,
@@ -245,8 +277,13 @@ setState(() {
 
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            SocialButton(imagePath: "assets/icons/google.png"),
+                          children: [
+                            GestureDetector(
+                              onTap: _handleGoogleSignIn,
+                              child: SocialButton(
+                                imagePath: "assets/icons/google.png",
+                              ),
+                            ),
                             SizedBox(width: 10),
                             SocialButton(
                               imagePath: "assets/icons/facebook.png",
@@ -269,7 +306,7 @@ setState(() {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>  SignupPage(),
+                                    builder: (context) => SignupPage(),
                                   ),
                                 );
                               },
@@ -278,7 +315,6 @@ setState(() {
                                 style: TextStyle(color: Colors.blue),
                               ),
                             ),
-                           
                           ],
                         ),
                       ],
@@ -295,7 +331,7 @@ setState(() {
 
   @override
   void dispose() {
-     emailController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     super.dispose();
   }

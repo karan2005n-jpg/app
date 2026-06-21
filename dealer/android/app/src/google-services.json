@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "398354109407",
+    "project_id": "dealer-management-b84ae",
+    "storage_bucket": "dealer-management-b84ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398354109407:android:ecb093a72abdd7f861aa6a",
+        "android_client_info": {
+          "package_name": "com.example.dealer"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "398354109407-5dkmb18mkc1vpgrvj0opvvu0jeh12nn7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFOuWm45Z8pz9Dyem9f5ABbgesJ-4oosA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398354109407-5dkmb18mkc1vpgrvj0opvvu0jeh12nn7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 import 'screens/auth/login_page.dart';
 import 'screens/auth/dashboard.dart';
-import 'package:provider/provider.dart';
 import 'provider/cart_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => CartProvider()..loadCart(),
@@ -20,19 +28,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LoginPage(),
 
-      onGenerateRoute: (settings) {
-        if (settings.name == '/dashboard') {
-          final userName = settings.arguments as String? ?? "User";
-
-          return MaterialPageRoute(
-            builder: (context) =>
-                DashboardPage(userName: userName, successMessage: ""),
-          );
-        }
-        return null;
-      },
+      home: const LoginPage(),
     );
   }
 }
