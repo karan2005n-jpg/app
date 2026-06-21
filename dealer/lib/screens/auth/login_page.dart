@@ -94,7 +94,6 @@ class _LoginPageState extends State<LoginPage> {
           messageColor = Colors.green;
         });
 
-        // 3. Fixed the exact error crash line by passing 'userName' variable
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
